@@ -65,9 +65,9 @@ def batch_predict(model_data_path, image_path_list):
     width = 304
     channels = 3
     batch_size = 1
-    rel = 0
-    rms = 0
-    lg10 = 0
+    rel_final = 0
+    rms_final = 0
+    lg10_final = 0
     # Create a placeholder for the input image
     input_node = tf.placeholder(tf.float32, shape=(None, height, width, channels))
 
@@ -116,16 +116,21 @@ def batch_predict(model_data_path, image_path_list):
             print(img_name)
             dbname = 'depth/' + img_name
             depth_gt = f[dbname]
+            print(depth_gt.shape)
+            print(pred.shape)  #  (1, 128, 160, 1) #
+            pred = pred[0]
+            pred = pred[:,:,0] #128*160
+
             rel,rms,lg10 = metric.error_metrics(depth_pred=pred,depth_gt=depth_gt)
-            rel += rel
-            rms += rms
-            lg10 += lg10
+            rel_final += rel
+            rms_final += rms
+            lg10_final += lg10
         f.close()
         test_images_num = len(image_path_list)
-        rel = rel / test_images_num
-        rms = rms / test_images_num
-        lg10 = lg10 / test_images_num
-        print("rel,rms,lg10:",rel,rms,lg10)
+        rel_final = rel_final / test_images_num
+        rms_final = rms_final / np.sqrt(test_images_num)
+        lg10_final = lg10_final / test_images_num
+        print("rel,rms,lg10:",rel_final,rms_final,lg10_final)
         #return pred
 def main():
     # Parse arguments
