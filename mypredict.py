@@ -10,6 +10,7 @@ import skimage.io as skio
 import metric
 import h5py
 import models
+import cv2
 
 def predict(model_data_path, image_path):
 
@@ -61,6 +62,8 @@ def predict(model_data_path, image_path):
 def batch_predict(model_data_path, image_path_list):
 
     # Default input size
+    ori_height = 480
+    ori_width = 640
     height = 228
     width = 304
     channels = 3
@@ -68,6 +71,7 @@ def batch_predict(model_data_path, image_path_list):
     rel_final = 0
     rms_final = 0
     lg10_final = 0
+
     # Create a placeholder for the input image
     input_node = tf.placeholder(tf.float32, shape=(None, height, width, channels))
 
@@ -94,14 +98,31 @@ def batch_predict(model_data_path, image_path_list):
         i = 0
         for image_path in image_path_list:
             # Read image
-            img = Image.open(image_path)
+            '''img = Image.open(image_path)
             img = img.resize([width,height], Image.ANTIALIAS)
             img = np.array(img).astype('float32')
             img = np.expand_dims(np.asarray(img), axis = 0)
+            #print("img shape:",img.shape)'''
+            
+            # modified read image by center crop
+            '''img = Image.open(image_path)
+            img = img.resize([ori_width//2,ori_height//2], Image.ANTIALIAS)
+            img = np.array(img).astype('float32') # 240*320*3
+            img = img[6:234,8:312,:]
+            img = np.expand_dims(np.asarray(img), axis = 0)
+            #print("img shape:",img.shape)'''
+            
+            # read and resize by opencv
+            img = cv2.imread(image_path) #array:(480,640,3)
+            #img = cv2.resize(img,(ori_width//2,ori_height//2),interpolation=cv2.INTER_NEAREST)
+            img = cv2.resize(img,(ori_width//2,ori_height//2))#,interpolation=cv2.INTER_AREA)
+            img = img[6:234,8:312,:]
+            img = np.expand_dims(np.asarray(img), axis = 0)
+            print("img shape:",img.shape)
 
             # Evalute the network for the given image
             pred = sess.run(net.get_output(), feed_dict={input_node: img}) #<class 'numpy.ndarray'>
-
+            # pred has shape of 1*128*160*1
 
             # Plot result
             '''fig = plt.figure()
@@ -117,9 +138,11 @@ def batch_predict(model_data_path, image_path_list):
             dbname = 'depth/' + img_name
             depth_gt = f[dbname]
             print(depth_gt.shape)
-            print(pred.shape)  #  (1, 128, 160, 1) #
-            pred = pred[0]
-            pred = pred[:,:,0] #128*160
+            #print(pred.shape)  #  (1, 128, 160, 1) #
+            #pred = pred[0]
+            #pred = pred[:,:,0] #128*160
+            pred = pred[0,:,:,0] #convert to 128*160
+            print(pred.shape)
 
             rel,rms,lg10 = metric.error_metrics(depth_pred=pred,depth_gt=depth_gt)
             rel_final += rel
@@ -128,7 +151,7 @@ def batch_predict(model_data_path, image_path_list):
         f.close()
         test_images_num = len(image_path_list)
         rel_final = rel_final / test_images_num
-        rms_final = rms_final / np.sqrt(test_images_num)
+        rms_final = np.sqrt(rms_final / test_images_num)
         lg10_final = lg10_final / test_images_num
         print("rel,rms,lg10:",rel_final,rms_final,lg10_final)
         #return pred
